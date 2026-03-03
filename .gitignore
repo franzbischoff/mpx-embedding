@@ -1,0 +1,28 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Compiled
+*.out
+*.elf
+*.hex
+
+# Dependencies
+*.d
+
+# Debug files
+*.gdb
+core
+tmp/
