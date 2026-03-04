@@ -102,12 +102,12 @@ void Mpx::movsig_() {
   // <= 4.5e+5 (psig >= 4.94e-12) For sd < 100; window 25 -> sig will be >= 0.002 (psig <= 25e4) and for window 350 ->
   // sig will be >= 0.0005 (psig <= 4e6)
 
-  if (psig > __FLT_EPSILON__ && psig < 4000000.0F) {
-    this->vsig_[buffer_start_] = 1.0F / sqrtf(psig);
-  } else {
-    LOG_DEBUG(TAG, "DEBUG: psig1 precision, %.3f", psig);
-    this->vsig_[buffer_start_] = -1.0F;
-  }
+  // if (psig > __FLT_EPSILON__ && psig < 4000000.0F) {
+  this->vsig_[buffer_start_] = 1.0F / sqrtf(psig);
+  // } else {
+  //   LOG_DEBUG(TAG, "DEBUG: psig1 precision, %.3f", psig);
+  //   this->vsig_[buffer_start_] = -1.0F;
+  // }
 
   for (uint16_t i = (this->window_size_ + buffer_start_); i < this->buffer_size_; i++) {
     float const m = this->data_buffer_[i - this->window_size_] * this->data_buffer_[i - this->window_size_];
@@ -181,12 +181,12 @@ void Mpx::muinvn_(uint16_t size) {
     resid2 = resid2 + ((p - (accum2 - t)) + (n - t));
 
     float const psig = (accum2 + resid2) - vmmu_[i] * vmmu_[i] * (float)window_size_;
-    if (psig > __FLT_EPSILON__ && psig < 4000000.0F) {
-      vsig_[i] = 1.0F / sqrtf(psig);
-    } else {
-      LOG_DEBUG(TAG, "DEBUG: psig precision, %.3f", psig);
-      vsig_[i] = -1.0F;
-    }
+    // if (psig > __FLT_EPSILON__ && psig < 4000000.0F) {
+    vsig_[i] = 1.0F / sqrtf(psig);
+    // } else {
+    //   LOG_DEBUG(TAG, "DEBUG: psig precision, %.3f", psig);
+    //   vsig_[i] = -1.0F;
+    // }
   }
 
   this->last_accum_ = accum;
@@ -316,13 +316,23 @@ void Mpx::ww_s_() {
 
 void Mpx::prune_buffer() {
   // prune buffer
-  data_buffer_[0] = 0.001F;
+  // data_buffer_[0] = 0.001F;
 
-  for (uint16_t i = 1U; i < buffer_size_; i++) {
-    float mock = (float)((RAND() % 1000) - 500);
-    mock /= 1000.0F;
-    data_buffer_[i] = data_buffer_[i - 1] + mock;
+  // for (uint16_t i = 1U; i < buffer_size_; i++) {
+  //   float mock = (float)((RAND() % 1000) - 500);
+  //   mock /= 1000.0F;
+  //   data_buffer_[i] = data_buffer_[i - 1] + mock;
+  // }
+
+  // prune buffer - Initialize with sinusoidal pattern for reproducible results
+  // Period of 100 samples matches typical window_size
+  const float period = 100.0F;
+  const float two_pi = 2.0F * 3.14159265358979323846F; // M_PI replacement
+
+  for (uint16_t i = 0U; i < buffer_size_; i++) {
+    data_buffer_[i] = sinf(two_pi * (float)i / period);
   }
+
   buffer_used_ = buffer_size_;
   buffer_start_ = 0;
   muinvn_(0U);
@@ -349,19 +359,43 @@ void Mpx::prune_buffer() {
  */
 void Mpx::floss_iac_() {
 
-  uint16_t *mpi = nullptr;
+  // uint16_t *mpi = nullptr;
 
-  mpi = ((uint16_t *)calloc(this->profile_len_ + 1U, sizeof(uint16_t)));
+  // mpi = ((uint16_t *)calloc(this->profile_len_ + 1U, sizeof(uint16_t)));
 
-  if (mpi == nullptr) {
-    LOG_DEBUG(TAG, "Memory allocation failed");
-    return;
-  }
+  // if (mpi == nullptr) {
+  //   LOG_DEBUG(TAG, "Memory allocation failed");
+  //   return;
+  // }
+
+  // for (uint16_t i = 0U; i < this->profile_len_; i++) {
+  //   this->iac_[i] = 0.0F;
+  // }
+
+  // ========== KUMARASWAMY DISTRIBUTION (Analytical) ==========
+  // Instead of Monte Carlo simulation, use the analytical Kumaraswamy distribution
+  // which provides the theoretical ideal arc counts distribution
+  const float a = 1.939274f;
+  const float b = 1.698150f;
+  const float cac_size = static_cast<float>(this->profile_len_);
+  const float normalization = 4.035477f;
 
   for (uint16_t i = 0U; i < this->profile_len_; i++) {
-    this->iac_[i] = 0.0F;
+    float x = static_cast<float>(i) / cac_size;
+
+    // Kumaraswamy distribution formula:
+    // iac = a * b * x^(a-1) * (1 - x^a)^(b-1) * cac_size / 4.035477
+    float x_a_minus_1 = powf(x, a - 1.0f);
+    float one_minus_x_a = 1.0f - powf(x, a);
+    float one_minus_x_a_b_minus_1 = powf(one_minus_x_a, b - 1.0f);
+
+    this->iac_[i] = a * b * x_a_minus_1 * one_minus_x_a_b_minus_1 * cac_size / normalization;
   }
 
+  // ========== OLD MONTE CARLO IMPLEMENTATION (COMMENTED OUT) ==========
+  // Previous approach using Monte Carlo simulation with random indices
+  // Results should be very similar to the Kumaraswamy distribution above
+  /*
   for (uint16_t k = 0U; k < 10; k++) { // repeat 10 times to smooth the result
     for (uint16_t i = 0U; i < (this->profile_len_ - this->exclusion_zone_ - 1); i++) {
       mpi[i] = (RAND() % (this->range_ - (i + this->exclusion_zone_))) + (i + this->exclusion_zone_);
@@ -379,12 +413,13 @@ void Mpx::floss_iac_() {
       this->iac_[j] -= 0.1F;
     }
   }
-  // cumsum
-  for (uint16_t i = 0U; i < this->range_; i++) {
-    this->iac_[i + 1U] += this->iac_[i];
-  }
+  */
+  // // cumsum
+  // for (uint16_t i = 0U; i < this->range_; i++) {
+  //   this->iac_[i + 1U] += this->iac_[i];
+  // }
 
-  free(mpi); // test for edit session
+  // free(mpi); // No longer needed with Kumaraswamy distribution
 }
 
 /**
@@ -442,26 +477,12 @@ void Mpx::floss() {
     this->floss_[j] -= 1.0F;
   }
 
-  // const float a = 1.939274;
-  // const float b = 1.69815;
-  // const float c = 4.035477;
-  ////  const float len = (float)this->profile_len_;
-  ////  const float x = 1.0F / len;
-  ////  const float llen = len * 1.1494F;
-  ////  float iac = 0.001F; // cppcheck-suppress unreadVariable
-
   // cumsum
   for (uint16_t i = 0U; i < this->range_; i++) {
     this->floss_[i + 1U] += this->floss_[i];
     if (i < this->window_size_ || i > (this->profile_len_ - this->window_size_)) {
       this->floss_[i] = 1.0F;
     } else {
-      // iac = a * b * powf(i * x, a - 1.0) * powf(1.0 - powf(i * x, a), b - 1.0) * len / c;
-      // iac = 0.816057 * len * powf(i * x, 0.939274) * powf(1 - powf(i * x, 1.93927), 0.69815);
-      // iac = 0.8245 * powf(i * x, 0.94) * powf(1.0 - powf(i * x, 1.94), 0.7) * len;
-      //     // const float idx = (float)i * x;
-      //     // iac = powf(idx, 1.08F) * powf(1.0F - idx, 0.64F) * llen; // faster
-      // iac = a * b * powf(idx, (a - 1)) * powf(1 - powf(idx, a), (b - 1)) * len / 4.035477;
       if (this->floss_[i] > this->iac_[i]) {
         this->floss_[i] = 1.0F;
       } else {
@@ -469,10 +490,6 @@ void Mpx::floss() {
       }
     }
   }
-
-  // x <- seq(0, 1, length.out = cac_size)
-  //  mode <- 0.6311142 # best point to analyze the segment change
-  //  iac <- a * b * x^(a - 1) * (1 - x^a)^(b - 1) * cac_size / 4.035477
 }
 
 // cppcheck-suppress unusedFunction
