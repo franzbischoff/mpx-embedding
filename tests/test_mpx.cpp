@@ -50,7 +50,7 @@ void test_mpx_compute() {
     }
 
     // Test 1: Compute with data
-    uint16_t result = mpx.compute(test_data, 256);
+    mpx.compute(test_data, 256);
     bool test1 = true; // If no exception, passed
     print_test_result("Compute without exception", test1);
 
@@ -150,7 +150,6 @@ void test_mpx_data_access() {
 
     // Test information getters
     uint16_t buf_used = mpx.get_buffer_used();
-    int16_t buf_start = mpx.get_buffer_start();
     uint16_t prof_len = mpx.get_profile_len();
 
     bool test2 = (buf_used > 0 && prof_len > 0);
@@ -174,7 +173,7 @@ int main() {
     test_mpx_data_access();
 
     std::cout << "\n╔════════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║       All tests completed successfully!             ║" << std::endl;
+    std::cout << "║       All tests completed successfully!            ║" << std::endl;
     std::cout << "╚════════════════════════════════════════════════════╝" << std::endl;
 
     return 0;

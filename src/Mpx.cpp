@@ -13,20 +13,20 @@ Mpx::Mpx(const uint16_t window_size, float ez, uint16_t time_constraint, const u
       range_(profile_len_ - 1U),
       exclusion_zone_(
           static_cast<uint16_t>(roundf(static_cast<float>(window_size_) * ez_ + __FLT_EPSILON__) + 1.0F)), // -V2004
-      data_buffer_(std::make_unique<float[]>(buffer_size_ + 1U).release()),
-      vmatrix_profile_(std::make_unique<float[]>(profile_len_ + 1U).release()),
-      vprofile_index_(std::make_unique<int16_t[]>(profile_len_ + 1U).release()),
-      floss_(std::make_unique<float[]>(profile_len_ + 1U).release()),
-      iac_(std::make_unique<float[]>(profile_len_ + 1U).release()),
-      vmmu_(std::make_unique<float[]>(profile_len_ + 1U).release()),
-      vsig_(std::make_unique<float[]>(profile_len_ + 1U).release()),
-      vddf_(std::make_unique<float[]>(profile_len_ + 1U).release()),
-      vddg_(std::make_unique<float[]>(profile_len_ + 1U).release()),
-      vww_(std::make_unique<float[]>(window_size_ + 1U).release()) {
+      data_buffer_(std::make_unique<float[]>(buffer_size_ + 1U)),
+      vmatrix_profile_(std::make_unique<float[]>(profile_len_ + 1U)),
+      vprofile_index_(std::make_unique<int16_t[]>(profile_len_ + 1U)),
+      floss_(std::make_unique<float[]>(profile_len_ + 1U)),
+      iac_(std::make_unique<float[]>(profile_len_ + 1U)),
+      vmmu_(std::make_unique<float[]>(profile_len_ + 1U)),
+      vsig_(std::make_unique<float[]>(profile_len_ + 1U)),
+      vddf_(std::make_unique<float[]>(profile_len_ + 1U)),
+      vddg_(std::make_unique<float[]>(profile_len_ + 1U)),
+      vww_(std::make_unique<float[]>(window_size_ + 1U)) {
 
   // change the default value to 0
 
-  if (vmatrix_profile_ != nullptr && vprofile_index_ != nullptr) {
+  if (vmatrix_profile_ && vprofile_index_) {
     for (uint16_t i = 0U; i < profile_len_; i++) {
       vmatrix_profile_[i] = -1000000.0F;
       vprofile_index_[i] = -1;
@@ -200,10 +200,10 @@ bool Mpx::new_data_(const float *data, uint16_t size) {
   bool first = true;
 
   if ((2U * size) > buffer_size_) {
-    LOG_DEBUG(TAG, "Data size is too large");
+    LOG_DEBUG(TAG, "%s", "Data size is too large");
     return false;
   } else if (size < (window_size_) && buffer_used_ < window_size_) {
-    LOG_DEBUG(TAG, "Data size is too small");
+    LOG_DEBUG(TAG, "%s", "Data size is too small");
     return false;
   } else {
     if ((buffer_start_ != buffer_size_) || buffer_used_ > 0U) {
@@ -405,7 +405,7 @@ void Mpx::floss_iac_() {
       uint16_t const j = mpi[i];
 
       if (j >= this->profile_len_) {
-        LOG_DEBUG(TAG, "j >= this->profile_len_");
+        LOG_DEBUG(TAG, "%s", "j >= this->profile_len_");
         continue;
       }
       // RMP, i is always < j
@@ -455,13 +455,13 @@ void Mpx::floss() {
     int16_t const j = vprofile_index_[i];
 
     if (j >= this->profile_len_) {
-      LOG_DEBUG(TAG, "DEBUG: j >= this->profile_len_");
+      LOG_DEBUG(TAG, "%s", "DEBUG: j >= this->profile_len_");
       continue;
     }
 
     if (j < 0) {
       if (j < -1) {
-        LOG_DEBUG(TAG, "DEBUG: j < -1");
+        LOG_DEBUG(TAG, "%s", "DEBUG: j < -1");
       }
       // LOG_DEBUG(TAG, "DEBUG: j < 0");
       // j = (rand() % (this->range_ - (i + this->exclusion_zone_))) + (i + this->exclusion_zone_);
@@ -573,17 +573,7 @@ uint16_t Mpx::compute(const float *data, uint16_t size) {
 }
 
 Mpx::~Mpx() {
-  // free arrays
-  free(this->vww_);
-  free(this->vddg_);
-  free(this->vddf_);
-  free(this->vsig_);
-  free(this->vmmu_);
-  free(this->iac_);
-  free(this->vprofile_index_);
-  free(this->vmatrix_profile_);
-  free(this->data_buffer_);
-  free(this->floss_);
+  // std::unique_ptr automatically releases memory
 }
 
 } // namespace MatrixProfile

@@ -47,16 +47,16 @@ public:
   void floss();
 
   // Getters
-  float *get_data_buffer() { return data_buffer_; };
-  float *get_matrix() { return vmatrix_profile_; };
-  int16_t *get_indexes() { return vprofile_index_; };
-  float *get_floss() { return floss_; };
-  float *get_iac() { return iac_; };
-  float *get_vmmu() { return vmmu_; };
-  float *get_vsig() { return vsig_; };
-  float *get_ddf() { return vddf_; };
-  float *get_ddg() { return vddg_; };
-  float *get_vww() { return vww_; };
+  float *get_data_buffer() { return data_buffer_.get(); };
+  float *get_matrix() { return vmatrix_profile_.get(); };
+  int16_t *get_indexes() { return vprofile_index_.get(); };
+  float *get_floss() { return floss_.get(); };
+  float *get_iac() { return iac_.get(); };
+  float *get_vmmu() { return vmmu_.get(); };
+  float *get_vsig() { return vsig_.get(); };
+  float *get_ddf() { return vddf_.get(); };
+  float *get_ddg() { return vddg_.get(); };
+  float *get_vww() { return vww_.get(); };
   uint16_t get_buffer_used() { return buffer_used_; };
   int16_t get_buffer_start() { return buffer_start_; };
   uint16_t get_profile_len() { return profile_len_; };
@@ -92,16 +92,16 @@ private:
   float last_resid2_ = 0.0F;
 
   // arrays
-  float *data_buffer_ = nullptr;
-  float *vmatrix_profile_ = nullptr;
-  int16_t *vprofile_index_ = nullptr;
-  float *floss_ = nullptr;
-  float *iac_ = nullptr;
-  float *vmmu_ = nullptr;
-  float *vsig_ = nullptr;
-  float *vddf_ = nullptr;
-  float *vddg_ = nullptr;
-  float *vww_ = nullptr;
+  std::unique_ptr<float[]> data_buffer_;
+  std::unique_ptr<float[]> vmatrix_profile_;
+  std::unique_ptr<int16_t[]> vprofile_index_;
+  std::unique_ptr<float[]> floss_;
+  std::unique_ptr<float[]> iac_;
+  std::unique_ptr<float[]> vmmu_;
+  std::unique_ptr<float[]> vsig_;
+  std::unique_ptr<float[]> vddf_;
+  std::unique_ptr<float[]> vddg_;
+  std::unique_ptr<float[]> vww_;
 };
 
 } // namespace MatrixProfile
