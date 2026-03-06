@@ -71,6 +71,9 @@ make run-gen-golden
 # Compile and run example
 make run-example
 
+# Profile performance (gprof)
+make profile
+
 # Compile with debug symbols
 make debug
 
@@ -178,6 +181,27 @@ gdb ./build/bin/test_mpx
 (gdb) step     # enter function
 (gdb) print mpx.get_buffer_used()
 ```
+
+## Profiling Performance
+
+To analyze performance and identify bottlenecks:
+
+```bash
+# Run comprehensive benchmarks with gprof profiling
+make profile
+
+# View generated report
+cat profiling_report.txt
+head -n 50 profiling_report.txt  # Quick summary
+```
+
+The profiling suite tests:
+- First-pass (cold start) computation
+- Streaming updates (incremental processing)
+- Small update performance (1, 2, 4 samples)
+- Shift overhead across different buffer sizes
+
+See [PROFILING.md](PROFILING.md) for detailed profiling guide and performance optimization strategies.
 
 ## Compiling for Microcontrollers
 

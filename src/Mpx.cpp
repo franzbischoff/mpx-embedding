@@ -142,11 +142,9 @@ void Mpx::muinvn_(uint16_t size) {
 
   uint16_t const j = this->profile_len_ - size;
 
-  // update 1 step
-  for (uint16_t i = 0U; i < j; i++) {
-    vmmu_[i] = vmmu_[i + size];
-    vsig_[i] = vsig_[i + size];
-  }
+  // update 1 step - use memmove for optimized bulk copy
+  std::memmove(vmmu_.get(), vmmu_.get() + size, j * sizeof(float));
+  std::memmove(vsig_.get(), vsig_.get() + size, j * sizeof(float));
 
   // compute new mmu sig
   float accum = this->last_accum_;   // OLINT(misc-const-correctness) - this variable can't be const
@@ -206,10 +204,9 @@ bool Mpx::new_data_(const float *data, uint16_t size) {
   } else {
     if ((buffer_start_ != buffer_size_) || buffer_used_ > 0U) {
       first = false;
-      // we must shift data
-      for (uint16_t i = 0U; i < (buffer_size_ - size); i++) {
-        this->data_buffer_[i] = this->data_buffer_[size + i];
-      }
+      // we must shift data - use memmove for optimized bulk copy
+      std::memmove(this->data_buffer_.get(), this->data_buffer_.get() + size,
+                   (buffer_size_ - size) * sizeof(float));
       // then copy
       for (uint16_t i = 0U; i < size; i++) {
         this->data_buffer_[(buffer_size_ - size + i)] = data[i];
@@ -240,11 +237,13 @@ void Mpx::mp_next_(uint16_t size) {
 
   uint16_t const j = this->profile_len_ - size;
 
-  // update 1 step
-  for (uint16_t i = 0; i < j; i++) {
-    vmatrix_profile_[i] = vmatrix_profile_[i + size];
+  // update 1 step - use memmove for optimized bulk copy
+  std::memmove(vmatrix_profile_.get(), vmatrix_profile_.get() + size, j * sizeof(float));
+  std::memmove(vprofile_index_.get(), vprofile_index_.get() + size, j * sizeof(int16_t));
 
-    vprofile_index_[i] = static_cast<int16_t>(vprofile_index_[i + size] - size); // the index must be reduced
+  // adjust indexes after shift
+  for (uint16_t i = 0; i < j; i++) {
+    vprofile_index_[i] = static_cast<int16_t>(vprofile_index_[i] - size);
 
     // avoid too negative values
     if (vprofile_index_[i] < -1) {
@@ -266,10 +265,9 @@ void Mpx::ddf_(uint16_t size) {
   uint16_t start = buffer_start_;
 
   if (size > 0U) {
-    // shift data
-    for (uint16_t i = buffer_start_; i < (range_ - size); i++) {
-      this->vddf_[i] = this->vddf_[i + size];
-    }
+    // shift data - use memmove for optimized bulk copy
+    std::memmove(this->vddf_.get() + buffer_start_, this->vddf_.get() + buffer_start_ + size,
+                 (range_ - size - buffer_start_) * sizeof(float));
 
     start = (range_ - size);
   }
@@ -290,10 +288,9 @@ void Mpx::ddg_(uint16_t size) {
   uint16_t start = buffer_start_;
 
   if (size > 0U) {
-    // shift data
-    for (uint16_t i = buffer_start_; i < (range_ - size); i++) {
-      this->vddg_[i] = this->vddg_[i + size];
-    }
+    // shift data - use memmove for optimized bulk copy
+    std::memmove(this->vddg_.get() + buffer_start_, this->vddg_.get() + buffer_start_ + size,
+                 (range_ - size - buffer_start_) * sizeof(float));
 
     start = (range_ - size);
   }
