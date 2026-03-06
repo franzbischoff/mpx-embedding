@@ -1,184 +1,303 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
+#include <cmath>
 #include "mpx/Mpx.hpp"
 
 using namespace MatrixProfile;
 
+// ============================================================================
+// TEST FRAMEWORK UTILITIES
+// ============================================================================
+
+int g_test_count = 0;
+int g_test_failed = 0;
+
 void print_test_result(const char *test_name, bool passed) {
+  g_test_count++;
+  if (!passed) g_test_failed++;
   std::cout << "[" << (passed ? "PASS" : "FAIL") << "] " << test_name << std::endl;
 }
 
+// Helper assertion macros (simplified from Unity framework)
+#define TEST_ASSERT_EQUAL_UINT16(expected, actual) \
+  do { \
+    if ((expected) != (actual)) { \
+      std::cerr << "  ERROR: " << __FILE__ << ":" << __LINE__ << std::endl; \
+      std::cerr << "    Expected: " << (expected) << ", Got: " << (actual) << std::endl; \
+      throw std::runtime_error("Assertion failed"); \
+    } \
+  } while(0)
+
+#define TEST_ASSERT_EQUAL_INT16(expected, actual) \
+  do { \
+    if ((expected) != (actual)) { \
+      std::cerr << "  ERROR: " << __FILE__ << ":" << __LINE__ << std::endl; \
+      std::cerr << "    Expected: " << (expected) << ", Got: " << (actual) << std::endl; \
+      throw std::runtime_error("Assertion failed"); \
+    } \
+  } while(0)
+
+#define TEST_ASSERT_FLOAT_WITHIN(tolerance, expected, actual) \
+  do { \
+    float diff = std::abs((expected) - (actual)); \
+    if (diff > (tolerance)) { \
+      std::cerr << "  ERROR: " << __FILE__ << ":" << __LINE__ << std::endl; \
+      std::cerr << "    Expected: " << (expected) << " ±" << (tolerance) << ", Got: " << (actual) << std::endl; \
+      throw std::runtime_error("Assertion failed"); \
+    } \
+  } while(0)
+
+#define TEST_ASSERT_TRUE(condition) \
+  do { \
+    if (!(condition)) { \
+      std::cerr << "  ERROR: " << __FILE__ << ":" << __LINE__ << std::endl; \
+      std::cerr << "    Condition failed: " << #condition << std::endl; \
+      throw std::runtime_error("Assertion failed"); \
+    } \
+  } while(0)
+
+
+// ============================================================================
+// TEST 1: Constructor Initialization and Initial State
+// ============================================================================
 /**
- * @brief Test Mpx class initialization
+ * VALIDATION:
+ * - buffer_used_ initialized to buffer_size
+ * - buffer_start_ initialized to 0
+ * - profile_len correctly computed: buffer_size - window_size + 1
+ * - Matrix profile array initialized to -1000000.0F (sentinel)
+ * - Profile index array initialized to -1 (no match found)
  */
-void test_mpx_initialization() {
-  std::cout << "\n=== Initialization Test ===" << std::endl;
+void test_mpx_constructor_initial_state() {
+  std::cout << "\n=== Test 1: Constructor Initial State ===" << std::endl;
 
   try {
-    // Test 1: Create instance with default parameters
-    Mpx mpx(128, 0.5f, 0, 5000);
+    const uint16_t window_size = 8U;
+    const uint16_t buffer_size = 64U;
+    Mpx mpx(window_size, 0.5F, 0U, buffer_size);
 
-    bool test1 = (mpx.get_buffer_used() == 5000);
-    print_test_result("Initialization with buffer size 5000", test1);
+    // CHECK 1: Buffer tracking state
+    TEST_ASSERT_EQUAL_UINT16(buffer_size, mpx.get_buffer_used());
+    print_test_result("Buffer used equals buffer_size", true);
 
-    // Test 2: Verify getters
+    // CHECK 2: Buffer read position
+    TEST_ASSERT_EQUAL_INT16(0, mpx.get_buffer_start());
+    print_test_result("Buffer start is 0", true);
+
+    // CHECK 3: Profile length calculation
+    const uint16_t expected_profile_len = buffer_size - window_size + 1U;
+    TEST_ASSERT_EQUAL_UINT16(expected_profile_len, mpx.get_profile_len());
+    print_test_result("Profile length correctly calculated", true);
+
+    // CHECK 4: Matrix profile initialization (sentinel values)
     float *matrix = mpx.get_matrix();
     int16_t *indexes = mpx.get_indexes();
-    float *floss = mpx.get_floss();
+    const uint16_t profile_len = mpx.get_profile_len();
 
-    bool test2 = (matrix != nullptr && indexes != nullptr && floss != nullptr);
-    print_test_result("Getters return valid pointers", test2);
-  } catch (const std::exception &e) {
-    std::cerr << "Unexpected exception: " << e.what() << std::endl;
-  }
-}
+    bool all_matrix_init_correct = true;
+    bool all_indexes_init_correct = true;
 
-/**
- * @brief Basic computation test
- */
-void test_mpx_compute() {
-  std::cout << "\n=== Computation Test ===" << std::endl;
-
-  try {
-    Mpx mpx(128, 0.5f, 0, 5000);
-
-    // Create test data
-    float test_data[256];
-    for (int i = 0; i < 256; i++) {
-      test_data[i] = static_cast<float>(i);
-    }
-
-    // Test 1: Compute with data
-    mpx.compute(test_data, 256);
-    bool test1 = true; // If no exception, passed
-    print_test_result("Compute without exception", test1);
-
-    // Test 2: Verify matrix was updated
-    float *matrix = mpx.get_matrix();
-    bool test2 = (matrix != nullptr);
-    print_test_result("Matrix after compute is valid", test2);
-  } catch (const std::exception &e) {
-    std::cerr << "Exception in test_mpx_compute: " << e.what() << std::endl;
-  }
-}
-
-/**
- * @brief FLOSS test
- */
-void test_mpx_floss() {
-  std::cout << "\n=== FLOSS Test ===" << std::endl;
-
-  try {
-    Mpx mpx(128, 0.5f, 0, 5000);
-
-    // Create data
-    float test_data[256];
-    for (int i = 0; i < 256; i++) {
-      test_data[i] = static_cast<float>(i % 100);
-    }
-
-    // Compute first
-    mpx.compute(test_data, 256);
-
-    // Compute FLOSS
-    mpx.floss();
-
-    float *floss = mpx.get_floss();
-    bool test1 = (floss != nullptr);
-    print_test_result("FLOSS returns valid data", test1);
-  } catch (const std::exception &e) {
-    std::cerr << "Exception in test_mpx_floss: " << e.what() << std::endl;
-  }
-}
-
-/**
- * @brief Data streaming test
- */
-void test_mpx_streaming() {
-  std::cout << "\n=== Streaming Test ===" << std::endl;
-
-  try {
-    Mpx mpx(64, 0.5f, 0, 1000);
-
-    // Simulate data streaming in chunks
-    bool test1 = true;
-    for (int chunk = 0; chunk < 5; chunk++) {
-      float data[128];
-      for (int i = 0; i < 128; i++) {
-        data[i] = static_cast<float>(chunk * 128 + i);
+    for (uint16_t i = 0U; i < profile_len; i++) {
+      if (std::abs(matrix[i] - (-1000000.0F)) > 0.001F) {
+        all_matrix_init_correct = false;
+        break;
       }
-      mpx.compute(data, 128);
+      if (indexes[i] != -1) {
+        all_indexes_init_correct = false;
+        break;
+      }
     }
-    print_test_result("Streaming multiple chunks", test1);
 
-    // Verify data was processed
-    float *matrix = mpx.get_matrix();
-    bool test2 = (matrix != nullptr);
-    print_test_result("Matrix after streaming is valid", test2);
+    TEST_ASSERT_TRUE(all_matrix_init_correct);
+    print_test_result("Matrix initialized to sentinel (-1000000.0)", all_matrix_init_correct);
 
-    // Prune buffer
-    mpx.prune_buffer();
-    bool test3 = true;
-    print_test_result("Prune buffer without error", test3);
+    TEST_ASSERT_TRUE(all_indexes_init_correct);
+    print_test_result("Indexes initialized to -1 (no match)", all_indexes_init_correct);
   } catch (const std::exception &e) {
-    std::cerr << "Exception in test_mpx_streaming: " << e.what() << std::endl;
+    print_test_result("Constructor initial state test", false);
+    std::cerr << "Exception: " << e.what() << std::endl;
   }
 }
 
+// ============================================================================
+// TEST 2: Buffer Pruning and State Consistency
+// ============================================================================
 /**
- * @brief Internal data access test
+ * VALIDATION:
+ * - prune_buffer() initializes data correctly
+ * - Internal buffers (ddf, ddg) are computed
+ * - Numerical stability maintained (finite values)
+ * - State consistency after pruning
  */
-void test_mpx_data_access() {
-  std::cout << "\n=== Data Access Test ===" << std::endl;
+void test_mpx_prune_buffer_invariants() {
+  std::cout << "\n=== Test 2: Prune Buffer Invariants ===" << std::endl;
 
   try {
-    Mpx mpx(128, 0.5f, 0, 5000);
+    const uint16_t window_size = 8U;
+    const uint16_t buffer_size = 64U;
+    Mpx mpx(window_size, 0.5F, 0U, buffer_size);
 
-    // Test all getters
-    float *data_buf = mpx.get_data_buffer();
+    // Explicitly call prune_buffer to ensure clean state
+    mpx.prune_buffer();
+
+    const uint16_t profile_len = mpx.get_profile_len();
+    float *data = mpx.get_data_buffer();
+    float *ddf = mpx.get_ddf();
+    float *ddg = mpx.get_ddg();
+
+    // CHECK 1: Data buffer sanity (sin(0) = 0 for sinusoidal pattern)
+    TEST_ASSERT_FLOAT_WITHIN(0.0001F, 0.0F, data[0]);
+    print_test_result("Data buffer first element is 0 (sin(0))", true);
+
+    // CHECK 2: Buffer state consistency
+    TEST_ASSERT_EQUAL_UINT16(buffer_size, mpx.get_buffer_used());
+    TEST_ASSERT_EQUAL_INT16(0, mpx.get_buffer_start());
+    print_test_result("Buffer state consistent after prune", true);
+
+    // CHECK 3: Differential arrays are computed
+    TEST_ASSERT_FLOAT_WITHIN(0.0001F, 0.0F, ddf[profile_len - 1U]);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001F, 0.0F, ddg[profile_len - 1U]);
+    print_test_result("Differential arrays (ddf, ddg) computed", true);
+
+    // CHECK 4: Internal accumulators are finite (no NaN, Inf)
+    bool movsum_finite = std::isfinite(mpx.get_last_movsum());
+    bool mov2sum_finite = std::isfinite(mpx.get_last_mov2sum());
+
+    TEST_ASSERT_TRUE(movsum_finite);
+    TEST_ASSERT_TRUE(mov2sum_finite);
+    print_test_result("Internal accumulators are finite (no NaN/Inf)", movsum_finite && mov2sum_finite);
+  } catch (const std::exception &e) {
+    print_test_result("Prune buffer invariants test", false);
+    std::cerr << "Exception: " << e.what() << std::endl;
+  }
+}
+
+// ============================================================================
+// TEST 3: Compute and FLOSS Output Validity (MAIN FUNCTIONAL TEST)
+// ============================================================================
+/**
+ * VALIDATION:
+ * - compute() produces valid matrix profile correlations
+ * - floss() generates valid goodness-of-fit scores
+ * - Nearest neighbors are found and stored in indexes
+ * - FLOSS edge values follow expected behavior
+ */
+void test_mpx_compute_and_floss_produce_valid_output() {
+  std::cout << "\n=== Test 3: Compute and FLOSS Functional Test ===" << std::endl;
+
+  try {
+    const uint16_t window_size = 8U;
+    const uint16_t buffer_size = 64U;
+    Mpx mpx(window_size, 0.5F, 0U, buffer_size);
+
+    // Generate synthetic signal: sine + trend
+    // This has structure to produce interesting matrix profile
+    float input[16];
+    for (uint16_t i = 0U; i < 16U; i++) {
+      input[i] = std::sin(static_cast<float>(i) * 0.2F) + (static_cast<float>(i) * 0.05F);
+    }
+
+    // SUBSTEP 1: Run matrix profile computation
+    uint16_t free_space = mpx.compute(input, 16U);
+    TEST_ASSERT_EQUAL_UINT16(0U, free_space);
+    print_test_result("Compute() processes data and fills buffer", true);
+
+    // SUBSTEP 2: Compute FLOSS (goodness of fit) scores
+    mpx.floss();
+    print_test_result("FLOSS computation runs without error", true);
+
+    // SUBSTEP 3: Retrieve outputs
+    const uint16_t profile_len = mpx.get_profile_len();
     float *matrix = mpx.get_matrix();
     int16_t *indexes = mpx.get_indexes();
-    float *floss_data = mpx.get_floss();
-    float *iac = mpx.get_iac();
-    float *vmmu = mpx.get_vmmu();
-    float *vsig = mpx.get_vsig();
+    float *floss = mpx.get_floss();
 
-    bool test1 = (data_buf != nullptr && matrix != nullptr && indexes != nullptr && floss_data != nullptr &&
-                  iac != nullptr && vmmu != nullptr && vsig != nullptr);
-    print_test_result("All getters return valid pointers", test1);
+    // CHECK 1: At least some matches were found
+    bool has_valid_match = false;
+    for (uint16_t i = 0U; i < profile_len; i++) {
+      if (indexes[i] >= 0 && matrix[i] > -999999.0F) {
+        has_valid_match = true;
+        break;
+      }
+    }
+    TEST_ASSERT_TRUE(has_valid_match);
+    print_test_result("At least one valid nearest neighbor found", has_valid_match);
 
-    // Test information getters
-    uint16_t buf_used = mpx.get_buffer_used();
-    uint16_t prof_len = mpx.get_profile_len();
+    // CHECK 2: All FLOSS values are finite (no NaN, Inf)
+    bool all_floss_finite = true;
+    for (uint16_t i = 0U; i < profile_len; i++) {
+      if (!std::isfinite(floss[i])) {
+        all_floss_finite = false;
+        break;
+      }
+    }
+    TEST_ASSERT_TRUE(all_floss_finite);
+    print_test_result("All FLOSS values are finite", all_floss_finite);
 
-    bool test2 = (buf_used > 0 && prof_len > 0);
-    print_test_result("Information getters return valid values", test2);
+    // CHECK 3: First window_size positions should have FLOSS ≈ 1.0 (boundary effect)
+    bool first_floss_correct = true;
+    for (uint16_t i = 0U; i < window_size && i < profile_len; i++) {
+      if (std::abs(floss[i] - 1.0F) > 0.0001F) {
+        first_floss_correct = false;
+        break;
+      }
+    }
+    TEST_ASSERT_TRUE(first_floss_correct);
+    print_test_result("First window_size FLOSS values ≈ 1.0 (edge case)", first_floss_correct);
+
+    // CHECK 4: Last window_size-1 positions should also have FLOSS ≈ 1.0
+    bool last_floss_correct = true;
+    for (uint16_t i = (profile_len > window_size) ? (profile_len - window_size + 1U) : 0U;
+         i < (profile_len > 0U ? profile_len - 1U : 0U); i++) {
+      if (std::abs(floss[i] - 1.0F) > 0.0001F) {
+        last_floss_correct = false;
+        break;
+      }
+    }
+    TEST_ASSERT_TRUE(last_floss_correct);
+    print_test_result("Last window_size-1 FLOSS values ≈ 1.0 (edge case)", last_floss_correct);
   } catch (const std::exception &e) {
-    std::cerr << "Exception in test_mpx_data_access: " << e.what() << std::endl;
+    print_test_result("Compute and FLOSS functional test", false);
+    std::cerr << "Exception: " << e.what() << std::endl;
   }
 }
 
 int main() {
   std::cout << "\n╔════════════════════════════════════════════════════╗" << std::endl;
-  std::cout << "║      Unit Tests - Mpx Library                      ║" << std::endl;
+  std::cout << "║      Unit Tests - Mpx Library (Unity-Style)        ║" << std::endl;
   std::cout << "║      Matrix Profile for Time Series                ║" << std::endl;
   std::cout << "╚════════════════════════════════════════════════════╝" << std::endl;
 
   try {
-    test_mpx_initialization();
-    test_mpx_compute();
-    test_mpx_floss();
-    test_mpx_streaming();
-    test_mpx_data_access();
+    // Run the comprehensive tests from Unity framework
+    test_mpx_constructor_initial_state();
+    test_mpx_prune_buffer_invariants();
+    test_mpx_compute_and_floss_produce_valid_output();
 
     std::cout << "\n╔════════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║       All tests completed successfully!            ║" << std::endl;
-    std::cout << "╚════════════════════════════════════════════════════╝" << std::endl;
+    std::cout << "║              Test Summary                          ║" << std::endl;
+    std::cout << "║  Total Tests: " << g_test_count << std::endl;
+    std::cout << "║  Passed: " << (g_test_count - g_test_failed) << std::endl;
+    std::cout << "║  Failed: " << g_test_failed << std::endl;
 
-    return 0;
+    if (g_test_failed == 0) {
+      std::cout << "║  Status: ALL TESTS PASSED ✓                        ║" << std::endl;
+      std::cout << "╚════════════════════════════════════════════════════╝" << std::endl;
+      return 0;
+    } else {
+      std::cout << "║  Status: SOME TESTS FAILED ✗                       ║" << std::endl;
+      std::cout << "╚════════════════════════════════════════════════════╝" << std::endl;
+      return 1;
+    }
   } catch (const std::exception &e) {
-    std::cerr << "Error during test execution: " << e.what() << std::endl;
+    std::cerr << "\nFATAL ERROR: " << e.what() << std::endl;
+    std::cout << "\n╔════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║              Test Summary                          ║" << std::endl;
+    std::cout << "║  Total Tests: " << g_test_count << std::endl;
+    std::cout << "║  Failed: " << g_test_failed << std::endl;
+    std::cout << "║  Status: TEST SUITE CRASHED ✗                     ║" << std::endl;
+    std::cout << "╚════════════════════════════════════════════════════╝" << std::endl;
     return 1;
   }
 }

@@ -6,8 +6,14 @@
 # Compile everything
 make
 
-# Compile and run tests
+# Compile and run basic tests
 make run-test
+
+# Compile and run robustness tests
+make run-test-robustness
+
+# Compile and run golden reference test
+make run-test-golden
 
 # Compile and run example
 make run-example
@@ -47,8 +53,9 @@ int main() {
 
 ### 4. Add Tests
 
-Edit `tests/test_mpx.cpp`:
+Edit test files:
 
+**Basic tests** (`tests/test_mpx.cpp`):
 ```cpp
 void test_your_functionality() {
     Mpx mpx(64, 0.5f, 0, 2000);
@@ -59,6 +66,10 @@ void test_your_functionality() {
 // Call in main()
 test_your_functionality();
 ```
+
+**Robustness tests** (`tests/test_mpx_robustness.cpp`): Test edge cases and numerical stability
+
+**Golden reference**: Generate with `make run-gen-golden`, test with `make run-test-golden`
 
 ### 5. Debug with GDB
 
@@ -79,9 +90,9 @@ gdb ./build/bin/test_mpx
 
 The library is ready to compile as part of the final binary:
 
-**ESP32 with ESP-IDF**: The library auto-detects `ESP_PLATFORM` and uses `esp_random()` and `ESP_LOG`.
+**ESP32 with ESP-IDF**: The library auto-detects `ESP_PLATFORM` and uses `ESP_LOG` for logging.
 
-**Linux**: Uses `rand()` and `printf`.
+**Linux**: Uses `printf`-based logging for debugging.
 
 ### 7. Cleanup
 

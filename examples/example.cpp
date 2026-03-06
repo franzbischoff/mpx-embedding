@@ -51,8 +51,9 @@ int main() {
   uint16_t chunks = 2;
   for (uint16_t chunk = 0; chunk < chunks; chunk++) {
     uint16_t offset = chunk * 256;
-    mpx.compute(&test_data[offset], 256);
-    std::cout << "   ✓ Processed chunk " << (chunk + 1) << "/" << chunks << std::endl;
+    uint16_t free_space = mpx.compute(&test_data[offset], 256);
+    std::cout << "   ✓ Processed chunk " << (chunk + 1) << "/" << chunks
+              << " (free space: " << free_space << " samples)" << std::endl;
   }
 
   std::cout << std::endl;

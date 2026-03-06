@@ -6,8 +6,8 @@ Time series analysis library implementing Matrix Profile algorithm (STOMP/STAMP)
 ## Architecture Decisions
 
 ### Platform-Aware Design
-- **ESP32**: Uses `ESP_PLATFORM` macro, `esp_random()`, `ESP_LOG` (see `include/mpx/Mpx.hpp:4-28`)
-- **Desktop**: Falls back to `rand()`, `printf`-based logging
+- **ESP32**: Uses `ESP_PLATFORM` macro, `ESP_LOG` (see `include/mpx/Mpx.hpp:4-28`)
+- **Desktop**: Falls back to `printf`-based logging
 - **Why**: Single codebase for embedded deployment + desktop debugging
 
 ### Memory Management Pattern
@@ -26,7 +26,10 @@ Uses `std::make_unique<>().release()` instead of raw `new[]`. **Why**: Exception
 ### Build & Test (Not CMake!)
 ```bash
 make              # Compile tests + example
-make run-test     # Compile and execute tests (shows output in new panel)
+make run-test     # Compile and execute basic tests
+make run-test-robustness  # Compile and execute robustness tests
+make run-test-golden      # Compile and execute golden reference test
+make run-gen-golden       # Generate golden reference CSV
 make run-example  # Compile and execute example
 make debug        # Compile with -g -O0 for GDB
 make clean        # Remove build/
@@ -40,7 +43,14 @@ make clean        # Remove build/
 - VSCode tasks defined in `.vscode/tasks.json` map to Makefile targets
 
 ### Testing Pattern
-Manual tests using `assert()` + `print_test_result()` helper (see `tests/test_mpx.cpp`). **Not** using Google Test/Catch2 to avoid dependencies. Each test function:
+Manual tests using `assert()` + `print_test_result()` helper. **Not** using Google Test/Catch2 to avoid dependencies.
+
+**Test suites**:
+1. **Basic tests** (`tests/test_mpx.cpp`): Core functionality (15 tests)
+2. **Robustness tests** (`tests/test_mpx_robustness.cpp`): Edge cases, numerical stability (15 tests)
+3. **Golden reference** (`tests/test_mpx_golden.cpp`): Regression testing against known-good results
+
+Each test function:
 1. Creates `Mpx` instance
 2. Performs operations
 3. Asserts conditions
@@ -50,8 +60,9 @@ Manual tests using `assert()` + `print_test_result()` helper (see `tests/test_mp
 
 ### Algorithm Implementation (src/Mpx.cpp)
 - **Kahan summation** for precision (see `movmean_()`, `movsig_()`)
-- **Monte Carlo simulation** for Ideal Arc Counts (`floss_iac_()`) - alternative to Kumaraswamy distribution
+- **Analytical Kumaraswamy distribution** for Ideal Arc Counts (`floss_iac_()`) - deterministic normalization
 - **Streaming data processing**: `compute()` accepts chunks, maintains circular buffer
+- **Sinusoidal initialization**: `prune_buffer()` fills buffer with deterministic sine pattern
 
 ### Data Access
 All getters return **raw pointers** to internal buffers (no copies). Caller must not delete:
@@ -72,8 +83,10 @@ float *floss = mpx.get_floss();          // Semantic segmentation
 1. Update `include/mpx/Mpx.hpp` for public API
 2. Implement in `src/Mpx.cpp` (private methods with `_` suffix)
 3. Add test in `tests/test_mpx.cpp` following existing pattern
-4. Update example in `examples/example.cpp` if user-facing
-5. Run `make run-test` to validate
+4. Consider adding robustness test in `tests/test_mpx_robustness.cpp`
+5. Update example in `examples/example.cpp` if user-facing
+6. Run `make run-test && make run-test-robustness` to validate
+7. Regenerate golden reference with `make run-gen-golden` if algorithm changes
 
 ### Platform-Specific Code
 Always check `ESP_PLATFORM` for conditional compilation:

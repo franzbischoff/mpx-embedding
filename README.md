@@ -15,9 +15,9 @@ Time series analysis library developed in C++17, implementing optimized Matrix P
 ## Implementation Features
 
 - **Algorithm**: Right Matrix Profile (RMP) with exclusion zone handling
-- **Random number generator**: ESP-IDF for ESP32, fallback to `rand()` on desktop
 - **Adaptive logging**: ESP_LOG for ESP32, `printf` on desktop
 - **Precision**: Cumulative calculation with residuals to minimize floating-point errors
+- **IAC Computation**: Analytical Kumaraswamy distribution for FLOSS normalization
 
 ## Project Structure
 
@@ -28,12 +28,15 @@ mpx-embedding/
 ├── src/                  # Implementation
 │   └── Mpx.cpp           # Mpx implementation
 ├── tests/                # Unit tests
-│   └── test_mpx.cpp      # Mpx class tests
+│   ├── test_mpx.cpp      # Basic unit tests
+│   ├── test_mpx_robustness.cpp  # Robustness tests
+│   ├── test_mpx_golden.cpp      # Regression tests
+│   ├── generate_golden_reference.cpp  # Golden reference generator
+│   ├── test_data.csv     # Test data
+│   └── golden_reference.csv  # Golden reference (generated)
 ├── examples/             # Usage examples
-│   └── example.cpp       # Complete practical example
-├── code/                 # Original user code (reference)
-│   ├── Mpx.hpp
-│   └── Mpx.cpp
+│   ├── example.cpp       # Complete practical example
+│   └── debug_buffers.cpp # Buffer inspection tool
 ├── build/                # Build directory (generated)
 ├── Makefile              # Build system
 └── README.md             # This file
@@ -53,8 +56,17 @@ mpx-embedding/
 # Compile everything (tests and example)
 make
 
-# Compile and run tests
+# Compile and run basic tests
 make run-test
+
+# Compile and run robustness tests
+make run-test-robustness
+
+# Compile and run golden reference test
+make run-test-golden
+
+# Generate golden reference CSV
+make run-gen-golden
 
 # Compile and run example
 make run-example
@@ -115,7 +127,7 @@ Mpx(uint16_t window_size,
 ```cpp
 uint16_t compute(const float *data, uint16_t size);
 void floss();                           // Compute FLOSS for segmentation
-void prune_buffer();                    // Reinitialize buffer with random data
+void prune_buffer();                    // Reinitialize buffer with sinusoidal pattern
 ```
 
 ### Getters - Data
@@ -188,7 +200,7 @@ make run-test   # Run tests
 ## Build Model
 
 - **Desktop (Linux)**: Simple Makefile compilation, no dependencies
-- **Embedded (ESP32)**: Compatible with ESP-IDF, uses `esp_random()` and `ESP_LOG`
+- **Embedded (ESP32)**: Compatible with ESP-IDF, uses `ESP_LOG` for logging
 - **No DLL**: Header-only compilation + source files linked directly to final binary
 
 ## Why Makefile?
@@ -215,12 +227,22 @@ The algorithm is based on:
 - **FLOSS**: Fast Low-cost Online Semantic Segmentation (Yeh et al.)
 - **STOMP**: Scalable Time series Ordered Motif (Pattern) Discovery
 
+## Testing
+
+The project includes comprehensive test suites:
+
+1. **Basic Tests** (`test_mpx.cpp`): Core functionality validation
+2. **Robustness Tests** (`test_mpx_robustness.cpp`): Edge cases and numerical stability
+3. **Golden Reference Tests** (`test_mpx_golden.cpp`): Regression testing against known-good results
+
 ## Next Steps for Development
 
 1. Use `make run-test` to iterate quickly
 2. Add your specific tests in `tests/test_mpx.cpp`
-3. Use `make debug` + GDB to inspect internal calculations
-4. Modify `include/mpx/Mpx.hpp` to customize as needed
+3. Run `make run-test-robustness` to verify robustness
+4. Generate golden reference with `make run-gen-golden` for regression testing
+5. Use `make debug` + GDB to inspect internal calculations
+6. Modify `include/mpx/Mpx.hpp` to customize as needed
 
 ## License
 
