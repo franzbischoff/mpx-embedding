@@ -1,13 +1,16 @@
-# Mpx Library - Matrix Profile for C++17
+# Mpx Library - Matrix Profile for Arduino
 
-Time series analysis library developed in C++17, implementing optimized Matrix Profile algorithm with FLOSS. Optimized for embedded microcontrollers with native Linux debugging and testing support.
+Time series analysis library for Arduino-compatible microcontrollers, implementing
+an optimized Matrix Profile algorithm with FLOSS. The public library code uses
+portable C++ compatible with classic AVR boards, while the repository also
+provides native Linux tests and development tools.
 
 ## Features
 
 - **Matrix Profile**: Efficient implementation of STOMP/STAMP algorithm
 - **FLOSS**: Fast Low-cost Online Semantic Segmentation for change detection
 - **Streaming**: Processes data streams with low memory overhead
-- **C++17**: Modern, type-safe and optimized
+- **Arduino-compatible**: Tested with the Arduino AVR core and Uno target
 - **No external dependencies**: Compilable with standard library only
 - **Inline compilation**: Compiled directly into final binary, no DLL/SO
 - **Embedded-friendly**: Optimized for microcontrollers
@@ -23,10 +26,12 @@ Time series analysis library developed in C++17, implementing optimized Matrix P
 
 ```
 mpx-embedding/
-├── include/mpx/          # Library headers
-│   └── Mpx.hpp           # Mpx class (Matrix Profile)
-├── src/                  # Implementation
+├── src/                  # Arduino library source and public header
+│   ├── Mpx.hpp           # Mpx class (Matrix Profile)
 │   └── Mpx.cpp           # Mpx implementation
+├── library.properties    # Arduino Library Manager metadata
+├── keywords.txt          # Arduino IDE syntax highlighting
+├── LICENSE               # MIT license
 ├── tests/                # Unit tests
 │   ├── test_mpx.cpp      # Basic unit tests
 │   ├── test_mpx_robustness.cpp  # Robustness tests
@@ -35,18 +40,36 @@ mpx-embedding/
 │   ├── test_data.csv     # Test data
 │   └── golden_reference.csv  # Golden reference (generated)
 ├── examples/             # Usage examples
-│   ├── example.cpp       # Complete practical example
+│   ├── BasicUsage/       # Arduino sketch example
+│   ├── example.cpp       # Complete native example
 │   └── debug_buffers.cpp # Buffer inspection tool
 ├── build/                # Build directory (generated)
 ├── Makefile              # Build system
 └── README.md             # This file
 ```
 
+## Installing in Arduino IDE
+
+Copy this repository into the Arduino libraries directory, or install the
+library from the Arduino Library Manager after it has been published. Include
+the public header in a sketch:
+
+```cpp
+#include <Mpx.hpp>
+
+using MatrixProfile::Mpx;
+Mpx mpx(16, 0.5F, 0U, 64U);
+```
+
+See `examples/BasicUsage/BasicUsage.ino` for a complete Arduino sketch. The
+library is distributed under the MIT license.
+
 ## Building the Project
 
 ### Requirements
 
-- GCC or Clang with C++17 support
+- GCC or Clang with C++17 support for native Linux development
+- Arduino CLI for board compilation
 - Make
 - Linux
 
@@ -87,7 +110,7 @@ make help
 ## Basic Usage
 
 ```cpp
-#include <mpx/Mpx.hpp>
+#include <Mpx.hpp>
 
 using namespace MatrixProfile;
 
@@ -266,11 +289,11 @@ The project includes comprehensive test suites:
 3. Run `make run-test-robustness` to verify robustness
 4. Generate golden reference with `make run-gen-golden` for regression testing
 5. Use `make debug` + GDB to inspect internal calculations
-6. Modify `include/mpx/Mpx.hpp` to customize as needed
+6. Modify `src/Mpx.hpp` to customize the public API as needed
 
 ## License
 
-[Add your license here]
+This project is distributed under the [MIT License](LICENSE).
 
 ---
 

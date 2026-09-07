@@ -1,7 +1,28 @@
-# Mpx Library - AI Agent Instructions
+# Mpx Arduino Library - AI Agent Instructions
+
+## Branch Purpose
+This branch is dedicated to developing the Mpx library as an Arduino-compatible
+library for embedded microcontrollers. Changes should preserve the public API's
+clarity, portability, and suitability for Arduino users.
+
+Use these project guides when adding or changing documentation, examples, and
+public APIs:
+
+- [Library Guide](library-guide.md): structure and conventions for creating an
+    Arduino library.
+- [Style Guide](style-guide.md): Arduino-style API naming, wording, and
+    formatting.
+
+Code and documentation contributions must follow both guides. When a local
+project convention conflicts with a guide, preserve embedded compatibility and
+document the reason for the exception.
 
 ## Project Overview
-Time series analysis library implementing Matrix Profile algorithm (STOMP/STAMP) with FLOSS. Designed for **embedded microcontrollers** (ESP32) with Linux development/testing support. C++17, no external dependencies, compiled inline (no DLL/SO).
+Time series analysis library implementing the Matrix Profile algorithm
+(STOMP/STAMP) with FLOSS. Designed for **embedded microcontrollers**, including
+Arduino-compatible boards and ESP32, with Linux development and testing support.
+The project uses C++17, has no external dependencies, and is compiled inline
+(no DLL/SO).
 
 ## Architecture Decisions
 
@@ -78,6 +99,14 @@ float *floss = mpx.get_floss();          // Semantic segmentation
 - `float` (32-bit) - assumes FPU on target microcontroller
 
 ## Development Guidelines
+
+### Arduino Library Documentation and Formatting
+- Follow `.github/library-guide.md` when organizing the library, examples, and
+    Arduino-facing documentation.
+- Follow `.github/style-guide.md` for public API names, user-facing wording,
+    examples, and Markdown formatting.
+- Keep public APIs approachable for Arduino users and avoid exposing
+    implementation details unless they are necessary for embedded use.
 
 ### Adding New Features
 1. Update `include/mpx/Mpx.hpp` for public API

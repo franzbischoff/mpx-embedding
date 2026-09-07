@@ -1,0 +1,9 @@
+Mpx	KEYWORD1
+MatrixProfile	LITERAL1
+compute	KEYWORD2
+floss	KEYWORD2
+prune_buffer	KEYWORD2
+get_matrix	KEYWORD2
+get_indexes	KEYWORD2
+get_floss	KEYWORD2
+is_valid	KEYWORD2

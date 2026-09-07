@@ -22,13 +22,13 @@ make run-example
 ### 2. File Structure
 
 The implementation is located in:
-- `include/mpx/Mpx.hpp` - Mpx class definition
+- `src/Mpx.hpp` - Mpx class definition
 - `src/Mpx.cpp` - Implementation (compiled into the binary)
 
 ### 3. Basic Usage
 
 ```cpp
-#include <mpx/Mpx.hpp>
+#include <Mpx.hpp>
 
 using namespace MatrixProfile;
 

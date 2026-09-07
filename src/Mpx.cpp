@@ -2,7 +2,7 @@
 
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 
-#include "mpx/Mpx.hpp"
+#include "Mpx.hpp"
 
 static const char TAG[] = "mpx";
 
@@ -18,7 +18,7 @@ uint16_t safe_exclusion_zone(const uint16_t window_size, const float ez, const u
   }
 
   float const requested = roundf(static_cast<float>(window_size) * ez + __FLT_EPSILON__) + 1.0F;
-  if (!std::isfinite(requested) || requested >= static_cast<float>(profile_len)) {
+  if (!isfinite(requested) || requested >= static_cast<float>(profile_len)) {
     return profile_len;
   }
 
@@ -29,19 +29,19 @@ uint16_t safe_exclusion_zone(const uint16_t window_size, const float ez, const u
 namespace MatrixProfile {
 Mpx::Mpx(const uint16_t window_size, float ez, uint16_t time_constraint, const uint16_t buffer_size)
     : window_size_(window_size), ez_(ez), time_constraint_(time_constraint), buffer_size_(buffer_size),
-      valid_config_(window_size_ > 0U && window_size_ <= buffer_size_ && buffer_size_ <= 32767U && std::isfinite(ez_) &&
+      valid_config_(window_size_ > 0U && window_size_ <= buffer_size_ && buffer_size_ <= 32767U && isfinite(ez_) &&
                     ez_ >= 0.0F),
       buffer_start_(valid_config_ ? static_cast<int16_t>(buffer_size) : 0),
       profile_len_(safe_profile_len(window_size_, buffer_size_, valid_config_)),
       range_(profile_len_ > 0U ? static_cast<uint16_t>(profile_len_ - 1U) : 0U),
       exclusion_zone_(safe_exclusion_zone(window_size_, ez_, profile_len_, valid_config_)),
-      data_buffer_(std::make_unique<float[]>(valid_config_ ? buffer_size_ + 1U : 1U)),
-      vmatrix_profile_(std::make_unique<float[]>(profile_len_ + 1U)),
-      vprofile_index_(std::make_unique<int16_t[]>(profile_len_ + 1U)),
-      floss_(std::make_unique<float[]>(profile_len_ + 1U)), iac_(std::make_unique<float[]>(profile_len_ + 1U)),
-      vmmu_(std::make_unique<float[]>(profile_len_ + 1U)), vsig_(std::make_unique<float[]>(profile_len_ + 1U)),
-      vddf_(std::make_unique<float[]>(profile_len_ + 1U)), vddg_(std::make_unique<float[]>(profile_len_ + 1U)),
-      vww_(std::make_unique<float[]>(valid_config_ ? window_size_ + 1U : 1U)) {
+      data_buffer_(new float[valid_config_ ? buffer_size_ + 1U : 1U]),
+      vmatrix_profile_(new float[profile_len_ + 1U]),
+      vprofile_index_(new int16_t[profile_len_ + 1U]),
+      floss_(new float[profile_len_ + 1U]), iac_(new float[profile_len_ + 1U]),
+      vmmu_(new float[profile_len_ + 1U]), vsig_(new float[profile_len_ + 1U]),
+      vddf_(new float[profile_len_ + 1U]), vddg_(new float[profile_len_ + 1U]),
+      vww_(new float[valid_config_ ? window_size_ + 1U : 1U]) {
 
   if (!valid_config_) {
     LOG_DEBUG(TAG, "%s", "Invalid MPX configuration; object disabled");
@@ -170,8 +170,8 @@ void Mpx::muinvn_(uint16_t size) {
   uint16_t const j = this->profile_len_ - size;
 
   // update 1 step - use memmove for optimized bulk copy
-  std::memmove(vmmu_.get(), vmmu_.get() + size, j * sizeof(float));
-  std::memmove(vsig_.get(), vsig_.get() + size, j * sizeof(float));
+  memmove(vmmu_, vmmu_ + size, j * sizeof(float));
+  memmove(vsig_, vsig_ + size, j * sizeof(float));
 
   // compute new mmu sig
   float accum = this->last_accum_;   // OLINT(misc-const-correctness) - this variable can't be const
@@ -242,7 +242,7 @@ bool Mpx::new_data_(const float *data, uint16_t size, bool &accepted) {
     if ((buffer_start_ != buffer_size_) || buffer_used_ > 0U) {
       first = false;
       // we must shift data - use memmove for optimized bulk copy
-      std::memmove(this->data_buffer_.get(), this->data_buffer_.get() + size, (buffer_size_ - size) * sizeof(float));
+      memmove(this->data_buffer_, this->data_buffer_ + size, (buffer_size_ - size) * sizeof(float));
       // then copy
       for (uint16_t i = 0U; i < size; i++) {
         this->data_buffer_[(buffer_size_ - size + i)] = data[i];
@@ -275,8 +275,8 @@ void Mpx::mp_next_(uint16_t size) {
   uint16_t const j = this->profile_len_ - size;
 
   // update 1 step - use memmove for optimized bulk copy
-  std::memmove(vmatrix_profile_.get(), vmatrix_profile_.get() + size, j * sizeof(float));
-  std::memmove(vprofile_index_.get(), vprofile_index_.get() + size, j * sizeof(int16_t));
+  memmove(vmatrix_profile_, vmatrix_profile_ + size, j * sizeof(float));
+  memmove(vprofile_index_, vprofile_index_ + size, j * sizeof(int16_t));
 
   // adjust indexes after shift
   for (uint16_t i = 0; i < j; i++) {
@@ -303,7 +303,7 @@ void Mpx::ddf_(uint16_t size) {
 
   if (size > 0U) {
     // shift data - use memmove for optimized bulk copy
-    std::memmove(this->vddf_.get() + buffer_start_, this->vddf_.get() + buffer_start_ + size,
+    memmove(this->vddf_ + buffer_start_, this->vddf_ + buffer_start_ + size,
                  (range_ - size - buffer_start_) * sizeof(float));
 
     start = (range_ - size);
@@ -326,7 +326,7 @@ void Mpx::ddg_(uint16_t size) {
 
   if (size > 0U) {
     // shift data - use memmove for optimized bulk copy
-    std::memmove(this->vddg_.get() + buffer_start_, this->vddg_.get() + buffer_start_ + size,
+    memmove(this->vddg_ + buffer_start_, this->vddg_ + buffer_start_ + size,
                  (range_ - size - buffer_start_) * sizeof(float));
 
     start = (range_ - size);
@@ -586,7 +586,7 @@ uint16_t Mpx::compute(const float *data, uint16_t size) {
       off_min = range_ - i - 1;
     } else {
       // ppcheck-suppress duplicateExpression
-      off_min = std::max(range_ - size, range_ - i - 1); // -V501
+      off_min = (range_ - size > range_ - i - 1) ? range_ - size : range_ - i - 1; // -V501
     }
 
     uint16_t const off_start = range_;
@@ -623,7 +623,16 @@ uint16_t Mpx::compute(const float *data, uint16_t size) {
 }
 
 Mpx::~Mpx() {
-  // std::unique_ptr automatically releases memory
+  delete[] data_buffer_;
+  delete[] vmatrix_profile_;
+  delete[] vprofile_index_;
+  delete[] floss_;
+  delete[] iac_;
+  delete[] vmmu_;
+  delete[] vsig_;
+  delete[] vddf_;
+  delete[] vddg_;
+  delete[] vww_;
 }
 
 } // namespace MatrixProfile
