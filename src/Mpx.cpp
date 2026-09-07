@@ -6,20 +6,47 @@
 
 static const char TAG[] = "mpx";
 
+namespace {
+uint16_t safe_profile_len(const uint16_t window_size, const uint16_t buffer_size, const bool valid_config) {
+  return valid_config ? static_cast<uint16_t>(buffer_size - window_size + 1U) : 0U;
+}
+
+uint16_t safe_exclusion_zone(const uint16_t window_size, const float ez, const uint16_t profile_len,
+                             const bool valid_config) {
+  if (!valid_config || profile_len == 0U) {
+    return 0U;
+  }
+
+  float const requested = roundf(static_cast<float>(window_size) * ez + __FLT_EPSILON__) + 1.0F;
+  if (!std::isfinite(requested) || requested >= static_cast<float>(profile_len)) {
+    return profile_len;
+  }
+
+  return static_cast<uint16_t>(requested);
+}
+} // namespace
+
 namespace MatrixProfile {
 Mpx::Mpx(const uint16_t window_size, float ez, uint16_t time_constraint, const uint16_t buffer_size)
     : window_size_(window_size), ez_(ez), time_constraint_(time_constraint), buffer_size_(buffer_size),
-      buffer_start_(static_cast<int16_t>(buffer_size)), profile_len_(buffer_size - window_size_ + 1U),
-      range_(profile_len_ - 1U),
-      exclusion_zone_(
-          static_cast<uint16_t>(roundf(static_cast<float>(window_size_) * ez_ + __FLT_EPSILON__) + 1.0F)), // -V2004
-      data_buffer_(std::make_unique<float[]>(buffer_size_ + 1U)),
+      valid_config_(window_size_ > 0U && window_size_ <= buffer_size_ && buffer_size_ <= 32767U && std::isfinite(ez_) &&
+                    ez_ >= 0.0F),
+      buffer_start_(valid_config_ ? static_cast<int16_t>(buffer_size) : 0),
+      profile_len_(safe_profile_len(window_size_, buffer_size_, valid_config_)),
+      range_(profile_len_ > 0U ? static_cast<uint16_t>(profile_len_ - 1U) : 0U),
+      exclusion_zone_(safe_exclusion_zone(window_size_, ez_, profile_len_, valid_config_)),
+      data_buffer_(std::make_unique<float[]>(valid_config_ ? buffer_size_ + 1U : 1U)),
       vmatrix_profile_(std::make_unique<float[]>(profile_len_ + 1U)),
       vprofile_index_(std::make_unique<int16_t[]>(profile_len_ + 1U)),
       floss_(std::make_unique<float[]>(profile_len_ + 1U)), iac_(std::make_unique<float[]>(profile_len_ + 1U)),
       vmmu_(std::make_unique<float[]>(profile_len_ + 1U)), vsig_(std::make_unique<float[]>(profile_len_ + 1U)),
       vddf_(std::make_unique<float[]>(profile_len_ + 1U)), vddg_(std::make_unique<float[]>(profile_len_ + 1U)),
-      vww_(std::make_unique<float[]>(window_size_ + 1U)) {
+      vww_(std::make_unique<float[]>(valid_config_ ? window_size_ + 1U : 1U)) {
+
+  if (!valid_config_) {
+    LOG_DEBUG(TAG, "%s", "Invalid MPX configuration; object disabled");
+    return;
+  }
 
   // change the default value to 0
 
@@ -191,11 +218,21 @@ void Mpx::muinvn_(uint16_t size) {
   this->last_resid2_ = resid2;
 }
 
-bool Mpx::new_data_(const float *data, uint16_t size) {
+bool Mpx::new_data_(const float *data, uint16_t size, bool &accepted) {
 
   bool first = true;
+  accepted = false;
 
-  if ((2U * size) > buffer_size_) {
+  if (!valid_config_) {
+    return false;
+  }
+
+  if (size > 0U && data == nullptr) {
+    LOG_DEBUG(TAG, "%s", "Data pointer is null");
+    return false;
+  }
+
+  if ((2U * size) > buffer_size_ || size >= profile_len_) {
     LOG_DEBUG(TAG, "%s", "Data size is too large");
     return false;
   } else if (size < (window_size_) && buffer_used_ < window_size_) {
@@ -205,8 +242,7 @@ bool Mpx::new_data_(const float *data, uint16_t size) {
     if ((buffer_start_ != buffer_size_) || buffer_used_ > 0U) {
       first = false;
       // we must shift data - use memmove for optimized bulk copy
-      std::memmove(this->data_buffer_.get(), this->data_buffer_.get() + size,
-                   (buffer_size_ - size) * sizeof(float));
+      std::memmove(this->data_buffer_.get(), this->data_buffer_.get() + size, (buffer_size_ - size) * sizeof(float));
       // then copy
       for (uint16_t i = 0U; i < size; i++) {
         this->data_buffer_[(buffer_size_ - size + i)] = data[i];
@@ -228,6 +264,7 @@ bool Mpx::new_data_(const float *data, uint16_t size) {
     if (buffer_start_ < 0) {
       buffer_start_ = 0;
     }
+    accepted = true;
   }
 
   return first;
@@ -310,6 +347,10 @@ void Mpx::ww_s_() {
 }
 
 void Mpx::prune_buffer() {
+  if (!valid_config_) {
+    return;
+  }
+
   // prune buffer
   // data_buffer_[0] = 0.001F;
 
@@ -352,6 +393,10 @@ void Mpx::prune_buffer() {
  * C++ also uses the analytical form in this implementation.
  */
 void Mpx::floss_iac_() {
+
+  if (!valid_config_) {
+    return;
+  }
 
   // uint16_t *mpi = nullptr;
 
@@ -402,7 +447,7 @@ void Mpx::floss_iac_() {
         LOG_DEBUG(TAG, "%s", "j >= this->profile_len_");
         continue;
       }
-      // RMP, i is always < j
+      // Right Matrix Profile: i is always < j.
       this->iac_[i] += 0.1F;
       this->iac_[j] -= 0.1F;
     }
@@ -440,11 +485,19 @@ void Mpx::floss_iac_() {
 // ppcheck-suppress unusedFunction
 void Mpx::floss() {
 
+  if (!valid_config_) {
+    return;
+  }
+
   for (uint16_t i = 0U; i < this->profile_len_; i++) {
     this->floss_[i] = 0.0F;
   }
 
-  for (uint16_t i = 0U; i < (this->profile_len_ - this->exclusion_zone_ - 1); i++) {
+  uint16_t const arc_limit = this->exclusion_zone_ >= this->profile_len_
+                                 ? 0U
+                                 : static_cast<uint16_t>(this->profile_len_ - this->exclusion_zone_ - 1U);
+
+  for (uint16_t i = 0U; i < arc_limit; i++) {
     int16_t const j = vprofile_index_[i];
 
     if (j >= this->profile_len_) {
@@ -465,7 +518,7 @@ void Mpx::floss() {
     if (j < i) {
       LOG_DEBUG(TAG, "DEBUG: i = %d ; j = %d ", i, j);
     }
-    // RMP, i is always < j
+    // Right Matrix Profile: i is always < j.
     this->floss_[i] += 1.0F;
     this->floss_[j] -= 1.0F;
   }
@@ -488,7 +541,12 @@ void Mpx::floss() {
 // ppcheck-suppress unusedFunction
 uint16_t Mpx::compute(const float *data, uint16_t size) {
 
-  bool const first = new_data_(data, size); // store new data on buffer
+  bool accepted = false;
+  bool const first = new_data_(data, size, accepted); // store new data on buffer
+
+  if (!accepted) {
+    return (this->buffer_size_ - this->buffer_used_);
+  }
 
   if (first) {
     muinvn_(0U);
@@ -547,7 +605,7 @@ uint16_t Mpx::compute(const float *data, uint16_t size) {
 
       float const c_cmp = c * vsig_[offset] * vsig_[off_diag];
 
-      // RMP
+      // Right Matrix Profile.
       // min off_diag is 0; max off_diag is (diag_end-1) == (profile_len_ - exclusion_zone_ - 1)
       if (c_cmp > vmatrix_profile_[off_diag]) {
         // LOG_DEBUG(TAG, "%f", c_cmp);

@@ -31,10 +31,28 @@
 // int16_t = -32768 to +32767
 
 namespace MatrixProfile {
+/**
+ * @brief Small-footprint streaming MPX implementation for embedded targets.
+ *
+ * Input contract:
+ * - every sample passed to compute() must be a finite IEEE-754 float;
+ * - NaN, +Inf and -Inf are not supported and must be filtered or rejected by
+ *   the caller before invoking compute();
+ * - this class intentionally has no non-finite-value mask or recovery path.
+ *
+ * NaN and infinities are IEEE-754 non-finite values. Passing any non-finite
+ * value is outside this class's contract and can contaminate its streaming
+ * state. The constructor performs configuration validation
+ * (`0 < window_size <= buffer_size <= 32767` and finite `ez`); an invalid
+ * configuration makes compute() a no-op, is reported through the configured
+ * logging backend, and can be queried with is_valid().
+ */
 class Mpx {
 public:
   // ppcheck-suppress noExplicitConstructor
   // Initialize MPX state and pre-allocate fixed buffers for streaming processing.
+  // time_constraint is retained for API compatibility; the streaming kernel
+  // currently does not apply it (historical parameter).
   Mpx(uint16_t window_size, float ez = 0.5F, uint16_t time_constraint = 0U, uint16_t buffer_size = 5000U);
   ~Mpx(); // destructor
 
@@ -71,11 +89,12 @@ public:
   [[nodiscard]] uint16_t get_buffer_used() const noexcept { return buffer_used_; };
   [[nodiscard]] int16_t get_buffer_start() const noexcept { return buffer_start_; };
   [[nodiscard]] uint16_t get_profile_len() const noexcept { return profile_len_; };
+  [[nodiscard]] bool is_valid() const noexcept { return valid_config_; };
   [[nodiscard]] float get_last_movsum() const noexcept { return last_accum_ + last_resid_; };
   [[nodiscard]] float get_last_mov2sum() const noexcept { return last_accum2_ + last_resid2_; };
 
 private:
-  bool new_data_(const float *data, uint16_t size);
+  bool new_data_(const float *data, uint16_t size, bool &accepted);
   void floss_iac_();
   void movmean_();
   void movsig_();
@@ -87,8 +106,10 @@ private:
 
   const uint16_t window_size_;
   const float ez_;
+  // Historical API field; intentionally not applied by the current kernel.
   const uint16_t time_constraint_;
   const uint16_t buffer_size_;
+  const bool valid_config_;
   uint16_t buffer_used_ = 0U;
   int16_t buffer_start_ = 0;
 
